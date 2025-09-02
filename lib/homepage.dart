@@ -73,7 +73,7 @@ class Homepage extends StatelessWidget {
       children: [
        featureTile("Disease Prediction","\nAI-powered symptom analysis", Icons.coronavirus, () {
       Navigator.push(context, MaterialPageRoute(
-        builder: (_) => const DiseasePredictionPage(),
+        builder: (_) => DiseasePredictionPage(),
       ));
     }),
 featureTile("Medicine Recommendation","\nPersonalized medicine", Icons.medical_services, () {

@@ -1,116 +1,174 @@
-import 'dart:convert';
+// lib/disease_prediction_page.dart
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:healthmate/homepage.dart';
+import 'disease_service.dart';
+import 'disease_symptoms.dart';
 
 class DiseasePredictionPage extends StatefulWidget {
-  const DiseasePredictionPage({super.key});
-
   @override
-  State<DiseasePredictionPage> createState() => _DiseasePredictionPageState();
+  _DiseasePredictionPageState createState() => _DiseasePredictionPageState();
 }
 
 class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
-  // Symptoms list
-  final Map<String, int> _symptoms = {
-    "fever": 0,
-    "cough": 0,
-    "fatigue": 0,
-    "headache": 0,
-    "nausea": 0,
-    "vomiting": 0,
-    "sore_throat": 0,
-    "runny_nose": 0,
-    "chest_pain": 0,
-    "diarrhea": 0,
-  };
+  Map<String, int> selectedSymptoms = {};
+  List<String> displayedSymptoms = [];
+  String predictedDisease = '';
+  TextEditingController searchController = TextEditingController();
 
-  String _prediction = ""; // Display prediction
-  bool _loading = false;
-
-  // Function to send data to Flask API
-  Future<void> _getPrediction() async {
-    setState(() {
-      _loading = true;
-      _prediction = "";
-    });
-
-    try {
-final url = Uri.parse('http://10.0.2.2:5000/predict');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(_symptoms),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _prediction = data['prediction'];
-        });
-      } else {
-        setState(() {
-          _prediction = "Error: Failed to get prediction";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _prediction = "Error: $e";
-      });
-    } finally {
-      setState(() {
-        _loading = false;
-      });
+  @override
+  void initState() {
+    super.initState();
+    for (var symptom in allSymptoms) {
+      selectedSymptoms[symptom] = 0;
     }
+    displayedSymptoms = List.from(allSymptoms);
+  }
+
+  void filterSymptoms(String query) {
+    setState(() {
+      displayedSymptoms = allSymptoms
+          .where((s) => s.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Disease Prediction"),
-        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF01D6A4)),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const Homepage()),
+            );
+          },
+        ),
+        title: Text("Disease Prediction",style: TextStyle(color: Colors.greenAccent,fontSize: 24),),
+        backgroundColor: Colors.black,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
           children: [
-            const Text(
-              "Select symptoms you have:",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // Search Bar
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF056443), Color(0xFF013924)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Color(0xFF00A57E), width: 1),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x6600A57E),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: searchController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Search symptoms...",
+                  hintStyle: const TextStyle(color: Colors.greenAccent),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF01D6A4)),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onChanged: filterSymptoms,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+
+            // Symptoms List
             Expanded(
               child: ListView(
-                children: _symptoms.keys.map((symptom) {
-                  return SwitchListTile(
-                    title: Text(symptom.replaceAll('_', ' ').toUpperCase()),
-                    value: _symptoms[symptom]! == 1,
+                children: displayedSymptoms.map((symptom) {
+                  return CheckboxListTile(
+                    tileColor: Colors.black,
+                    activeColor: const Color(0xFF01D6A4),
+                    checkColor: Colors.black,
+                    title: Text(symptom,
+                        style: const TextStyle(color: Colors.greenAccent)),
+                    value: selectedSymptoms[symptom] == 1,
                     onChanged: (val) {
                       setState(() {
-                        _symptoms[symptom] = val ? 1 : 0;
+                        selectedSymptoms[symptom] = val! ? 1 : 0;
                       });
                     },
                   );
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 16),
-            _loading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _getPrediction,
-                    child: const Text("Predict Disease"),
+
+            // Predict Button
+            GestureDetector(
+              onTap: () async {
+                String result =
+                    await DiseaseService.predictDisease(selectedSymptoms);
+                setState(() {
+                  predictedDisease = result;
+                });
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF056443), Color(0xFF013924)],
                   ),
-            const SizedBox(height: 20),
-            if (_prediction.isNotEmpty)
-              Text(
-                "Predicted Disease: $_prediction",
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFF00A57E), width: 1),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x6600A57E),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    "Predict Disease",
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+
+            // Predicted Disease Display
+            Container(
+              padding: const EdgeInsets.all(16),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF056443), Color(0xFF013924)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF00A57E), width: 1),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x6600A57E),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Text(
+                "Predicted Disease: $predictedDisease",
+                style: const TextStyle(
+                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18),
+              ),
+            ),
+            const SizedBox(height: 10),
           ],
         ),
       ),
