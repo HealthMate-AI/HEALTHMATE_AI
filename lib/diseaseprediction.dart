@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:healthmate/homepage.dart';
 import 'disease_service.dart';
 import 'disease_symptoms.dart';
+import 'disease_result_page.dart';
 
 class DiseasePredictionPage extends StatefulWidget {
+  const DiseasePredictionPage({super.key});
+
   @override
   _DiseasePredictionPageState createState() => _DiseasePredictionPageState();
 }
@@ -46,7 +49,10 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
             );
           },
         ),
-        title: Text("Disease Prediction",style: TextStyle(color: Colors.greenAccent,fontSize: 24),),
+        title: Text(
+          "Disease Prediction",
+          style: TextStyle(color: Colors.greenAccent, fontSize: 24),
+        ),
         backgroundColor: Colors.black,
       ),
       body: Padding(
@@ -110,6 +116,21 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
               onTap: () async {
                 String result =
                     await DiseaseService.predictDisease(selectedSymptoms);
+
+                // ✅ Navigate to ResultPage after prediction
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DiseaseResultPage(
+                      diseaseName: result,
+                      selectedSymptoms: selectedSymptoms.entries
+                          .where((entry) => entry.value == 1)
+                          .map((entry) => entry.key)
+                          .toList(),
+                    ),
+                  ),
+                );
+
                 setState(() {
                   predictedDisease = result;
                 });
@@ -142,33 +163,33 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
             ),
             const SizedBox(height: 16),
 
-            // Predicted Disease Display
-            Container(
-              padding: const EdgeInsets.all(16),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF056443), Color(0xFF013924)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF00A57E), width: 1),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x6600A57E),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Text(
-                "Predicted Disease: $predictedDisease",
-                style: const TextStyle(
-                    color: Colors.greenAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18),
-              ),
-            ),
-            const SizedBox(height: 10),
+            // Predicted Disease Display (optional preview)
+            // Container(
+            //   padding: const EdgeInsets.all(16),
+            //   width: double.infinity,
+            //   decoration: BoxDecoration(
+            //     gradient: const LinearGradient(
+            //       colors: [Color(0xFF056443), Color(0xFF013924)],
+            //     ),
+            //     borderRadius: BorderRadius.circular(20),
+            //     border: Border.all(color: const Color(0xFF00A57E), width: 1),
+            //     boxShadow: const [
+            //       BoxShadow(
+            //         color: Color(0x6600A57E),
+            //         blurRadius: 12,
+            //         spreadRadius: 2,
+            //       ),
+            //     ],
+            //   ),
+            //   child: Text(
+            //     "Predicted Disease: $predictedDisease",
+            //     style: const TextStyle(
+            //         color: Colors.greenAccent,
+            //         fontWeight: FontWeight.bold,
+            //         fontSize: 18),
+            //   ),
+            // ),
+            // const SizedBox(height: 10),
           ],
         ),
       ),
