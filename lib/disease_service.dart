@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 class DiseaseService {
   // Base URL of your Flask backend
-  static const String baseUrl = "http://10.254.219.151:5000";
+  static const String baseUrl = "http://127.0.0.1:5000";
 
   /// Predict disease based on selected symptoms.
   /// [symptomsMap] should be a map of symptom -> 1/0

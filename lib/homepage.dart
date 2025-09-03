@@ -78,7 +78,7 @@ class Homepage extends StatelessWidget {
     }),
 featureTile("Medicine Recommendation","\nPersonalized medicine", Icons.medical_services, () {
       Navigator.push(context, MaterialPageRoute(
-        builder: (_) => const Medicinerecommendation(),
+        builder: (_) => const MedicineRecommendationPage(),
       ));
     }),     ],
     ),
