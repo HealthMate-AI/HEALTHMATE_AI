@@ -5,6 +5,7 @@ import 'disease_service.dart';
 import 'disease_symptoms.dart';
 import 'disease_result_page.dart';
 
+
 class DiseasePredictionPage extends StatefulWidget {
   const DiseasePredictionPage({super.key});
 
