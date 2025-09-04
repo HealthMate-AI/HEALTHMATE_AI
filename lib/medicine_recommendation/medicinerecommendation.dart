@@ -17,27 +17,24 @@ class _MedicineRecommendationPageState
   List<String> recommendedMedicines = [];
   bool isLoading = false;
 
-  void getRecommendation() async {
+  bool get isInputValid {
     String disease = diseaseController.text.trim();
     int age = int.tryParse(ageController.text.trim()) ?? 0;
+    return disease.isNotEmpty && age > 0;
+  }
 
-    if (disease.isEmpty || age <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter valid disease and age"),
-          backgroundColor: Colors.red, // Red background for error
-        ),
-      );
-      return;
-    }
+  void getRecommendation() async {
+    if (!isInputValid) return; // Button shouldn't be active, but double-check
 
     setState(() {
       isLoading = true;
       recommendedMedicines = [];
     });
 
-    String medicine =
-        await MedicineService.getRecommendedMedicine(disease, age);
+    String medicine = await MedicineService.getRecommendedMedicine(
+      diseaseController.text.trim(),
+      int.parse(ageController.text.trim()),
+    );
 
     setState(() {
       recommendedMedicines = [medicine];
@@ -85,6 +82,7 @@ class _MedicineRecommendationPageState
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
 
@@ -105,19 +103,24 @@ class _MedicineRecommendationPageState
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 20),
 
-            // Get Recommendation Button with gradient
+            // Get Recommendation Button with gradient and disabled effect
             GestureDetector(
-              onTap: getRecommendation,
+              onTap: isInputValid ? getRecommendation : null,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF056443), Color(0xFF013924)],
-                  ),
+                  gradient: isInputValid
+                      ? const LinearGradient(
+                          colors: [Color(0xFF056443), Color(0xFF013924)],
+                        )
+                      : const LinearGradient(
+                          colors: [Colors.grey, Colors.grey],
+                        ),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(color: const Color(0xFF00A57E), width: 1),
                   boxShadow: const [
@@ -128,11 +131,12 @@ class _MedicineRecommendationPageState
                     ),
                   ],
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     "Get Recommendation",
                     style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                        color: isInputValid ? Colors.white : Colors.black38,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -154,7 +158,8 @@ class _MedicineRecommendationPageState
               ...recommendedMedicines.map((med) => ListTile(
                     leading: const Icon(Icons.medical_services,
                         color: Colors.greenAccent),
-                    title: Text(med, style: const TextStyle(color: Colors.white70)),
+                    title:
+                        Text(med, style: const TextStyle(color: Colors.white70)),
                   )),
             ]
           ],
