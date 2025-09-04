@@ -1,4 +1,3 @@
-// lib/disease_prediction_page.dart
 import 'package:flutter/material.dart';
 import 'package:healthmate/homepage.dart';
 import 'disease_service.dart';
@@ -113,84 +112,70 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
             ),
 
             // Predict Button
-            GestureDetector(
-              onTap: () async {
-                String result =
-                    await DiseaseService.predictDisease(selectedSymptoms);
+GestureDetector(
+  onTap: () async {
+    // Check if any symptom is selected
+    if (!selectedSymptoms.containsValue(1)) {
+      // Show a warning
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select at least one symptom!"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return; // Stop further execution
+    }
 
-                // ✅ Navigate to ResultPage after prediction
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DiseaseResultPage(
-                      diseaseName: result,
-                      selectedSymptoms: selectedSymptoms.entries
-                          .where((entry) => entry.value == 1)
-                          .map((entry) => entry.key)
-                          .toList(),
-                    ),
-                  ),
-                );
+    // Proceed with prediction
+    String result = await DiseaseService.predictDisease(selectedSymptoms);
 
-                setState(() {
-                  predictedDisease = result;
-                });
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF056443), Color(0xFF013924)],
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: const Color(0xFF00A57E), width: 1),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x6600A57E),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    "Predict Disease",
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
+    // Navigate to ResultPage
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DiseaseResultPage(
+          diseaseName: result,
+          selectedSymptoms: selectedSymptoms.entries
+              .where((entry) => entry.value == 1)
+              .map((entry) => entry.key)
+              .toList(),
+        ),
+      ),
+    );
+
+    setState(() {
+      predictedDisease = result;
+    });
+  },
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF056443), Color(0xFF013924)],
+      ),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: const Color(0xFF00A57E), width: 1),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x6600A57E),
+          blurRadius: 12,
+          spreadRadius: 2,
+        ),
+      ],
+    ),
+    child: const Center(
+      child: Text(
+        "Predict Disease",
+        style: TextStyle(
+            color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    ),
+  ),
+),
+
             const SizedBox(height: 16),
 
-            // Predicted Disease Display (optional preview)
-            // Container(
-            //   padding: const EdgeInsets.all(16),
-            //   width: double.infinity,
-            //   decoration: BoxDecoration(
-            //     gradient: const LinearGradient(
-            //       colors: [Color(0xFF056443), Color(0xFF013924)],
-            //     ),
-            //     borderRadius: BorderRadius.circular(20),
-            //     border: Border.all(color: const Color(0xFF00A57E), width: 1),
-            //     boxShadow: const [
-            //       BoxShadow(
-            //         color: Color(0x6600A57E),
-            //         blurRadius: 12,
-            //         spreadRadius: 2,
-            //       ),
-            //     ],
-            //   ),
-            //   child: Text(
-            //     "Predicted Disease: $predictedDisease",
-            //     style: const TextStyle(
-            //         color: Colors.greenAccent,
-            //         fontWeight: FontWeight.bold,
-            //         fontSize: 18),
-            //   ),
-            // ),
-            // const SizedBox(height: 10),
           ],
         ),
       ),
