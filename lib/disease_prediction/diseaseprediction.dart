@@ -5,7 +5,10 @@ import 'disease_symptoms.dart';
 import 'disease_result_page.dart';
 
 class DiseasePredictionPage extends StatefulWidget {
-  const DiseasePredictionPage({super.key});
+  final String username;
+  final String email;
+  const DiseasePredictionPage({super.key,required this.username,
+    required this.email,});
 
   @override
   _DiseasePredictionPageState createState() => _DiseasePredictionPageState();
@@ -46,7 +49,8 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const Homepage()),
+              MaterialPageRoute(builder: (_) => Homepage(username: widget.username,
+      email: widget.email,)),
             );
           },
         ),

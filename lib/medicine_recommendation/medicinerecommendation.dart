@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:healthmate/homepage.dart';
 import 'medicine_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MedicineRecommendationPage extends StatefulWidget {
-  const MedicineRecommendationPage({super.key});
+  final String username;
+  final String email;
+  const MedicineRecommendationPage({
+    super.key,
+    required this.username,
+    required this.email,
+  });
 
   @override
   _MedicineRecommendationPageState createState() =>
@@ -14,7 +22,9 @@ class _MedicineRecommendationPageState
     extends State<MedicineRecommendationPage> {
   TextEditingController diseaseController = TextEditingController();
   TextEditingController ageController = TextEditingController();
+
   List<String> recommendedMedicines = [];
+  String errorMessage = "";
   bool isLoading = false;
 
   bool get isInputValid {
@@ -23,22 +33,58 @@ class _MedicineRecommendationPageState
     return disease.isNotEmpty && age > 0;
   }
 
+  // Function to save recommendation to Firestore
+  Future<void> saveRecommendation(String disease, String medicine) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection("past_medicine_recommendations")
+          .add({
+        "userId": user.uid,
+        "diseaseName": disease,
+        "medicineName": medicine,
+        "timestamp": FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("Failed to save recommendation: $e");
+    }
+  }
+
   void getRecommendation() async {
-    if (!isInputValid) return; // Button shouldn't be active, but double-check
+    if (!isInputValid) return;
 
     setState(() {
       isLoading = true;
       recommendedMedicines = [];
+      errorMessage = "";
     });
 
-    String medicine = await MedicineService.getRecommendedMedicine(
+    List<String> response = await MedicineService.getRecommendedMedicine(
       diseaseController.text.trim(),
       int.parse(ageController.text.trim()),
     );
 
     setState(() {
-      recommendedMedicines = [medicine];
       isLoading = false;
+
+      if (response.isEmpty) {
+        errorMessage = "No medicine found for this input";
+      } else if (response.length == 1 &&
+          (response[0].startsWith("Error") ||
+              response[0].startsWith("❌") ||
+              response[0].startsWith("⚠️") ||
+              response[0].startsWith("🚨"))) {
+        errorMessage = response[0]; // API or connection error
+      } else {
+        recommendedMedicines = response;
+
+        // Save each recommended medicine to Firestore
+        for (var med in recommendedMedicines) {
+          saveRecommendation(diseaseController.text.trim(), med);
+        }
+      }
     });
   }
 
@@ -52,7 +98,12 @@ class _MedicineRecommendationPageState
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => const Homepage()),
+              MaterialPageRoute(
+                builder: (_) => Homepage(
+                  username: widget.username,
+                  email: widget.email,
+                ),
+              ),
             );
           },
         ),
@@ -66,7 +117,7 @@ class _MedicineRecommendationPageState
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Disease TextField
+            const SizedBox(height: 100),
             TextField(
               controller: diseaseController,
               style: const TextStyle(color: Colors.white),
@@ -85,8 +136,6 @@ class _MedicineRecommendationPageState
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
-
-            // Age TextField
             TextField(
               controller: ageController,
               keyboardType: TextInputType.number,
@@ -106,8 +155,6 @@ class _MedicineRecommendationPageState
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 20),
-
-            // Get Recommendation Button with gradient and disabled effect
             GestureDetector(
               onTap: isInputValid ? getRecommendation : null,
               child: Container(
@@ -142,26 +189,46 @@ class _MedicineRecommendationPageState
               ),
             ),
             const SizedBox(height: 20),
-
-            // Recommended Medicines Display
             if (isLoading) ...[
               const CircularProgressIndicator(color: Colors.greenAccent),
+            ] else if (errorMessage.isNotEmpty) ...[
+              Text(
+                errorMessage,
+                style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
+              ),
             ] else if (recommendedMedicines.isNotEmpty) ...[
               const Text(
-                "Recommended Medicines:",
+                "Recommended Medicine:",
                 style: TextStyle(
                     color: Colors.greenAccent,
                     fontSize: 18,
                     fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-              ...recommendedMedicines.map((med) => ListTile(
-                    leading: const Icon(Icons.medical_services,
-                        color: Colors.greenAccent),
-                    title:
-                        Text(med, style: const TextStyle(color: Colors.white70)),
-                  )),
-            ]
+              ...recommendedMedicines.map(
+                (med) => ListTile(
+                  leading: const Icon(Icons.medical_services,
+                      color: Colors.greenAccent),
+                  title: Text(
+                    med,
+                    style: const TextStyle(color: Colors.white70, fontSize: 19),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                "⚠️ Note: Please consult a healthcare professional for personalized advice.",
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),

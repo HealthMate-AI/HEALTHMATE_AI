@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class MedicineService {
-  static const String baseUrl = "http://127.0.0.1:5001"; // match Flask port
+  static const String baseUrl = "http://127.0.0.1:5001"; // Flask server URL
 
-  static Future<String> getRecommendedMedicine(String disease, int age) async {
+  static Future<List<String>> getRecommendedMedicine(String disease, int age) async {
     try {
       final url = Uri.parse('$baseUrl/recommend');
       final response = await http.post(
@@ -15,12 +15,23 @@ class MedicineService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['recommended_medicine'] ?? "No medicine found";
+
+        if (data.containsKey("recommended_medicine")) {
+          // Always return as a List<String>
+          final result = data["recommended_medicine"];
+          if (result is List) {
+            return result.map<String>((e) => e.toString()).toList();
+          } else {
+            return [result.toString()];
+          }
+        } else {
+          return ["No medicine found for this input"];
+        }
       } else {
-        return "Error: Could not fetch medicines";
+        return ["Error ${response.statusCode}: ${response.reasonPhrase}"];
       }
     } catch (e) {
-      return "Error: Could not connect to server";
+      return ["Error: Could not connect to server ($e)"];
     }
   }
 }

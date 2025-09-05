@@ -1,36 +1,20 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score
 import joblib
 
-# Load dataset
-data = pd.read_csv("medicine_data.csv")
+# Load CSV
+data = pd.read_csv("medicine_data.csv", quotechar='"')
 data.columns = data.columns.str.strip()
 
-# Create representative age column
-data["age"] = ((data["age_min"] + data["age_max"]) // 2).astype(int)
+# Ensure correct datatypes
+data["min_age"] = pd.to_numeric(data["min_age"], errors="coerce")
+data["max_age"] = pd.to_numeric(data["max_age"], errors="coerce")
+data = data.dropna(subset=["min_age", "max_age", "disease", "medicine"])
 
-# Features and target
-X = data[["disease", "age"]]
-y = data["medicine"]
+# Convert to int
+data["min_age"] = data["min_age"].astype(int)
+data["max_age"] = data["max_age"].astype(int)
 
-# One-hot encode disease
-X = pd.get_dummies(X, columns=["disease"])
+# Save lookup data as pickle
+joblib.dump(data, "medicine_lookup.pkl")
 
-# Train/test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-# Train Naive Bayes model
-model = MultinomialNB()
-model.fit(X_train, y_train)
-
-# Evaluate
-y_pred = model.predict(X_test)
-print("Accuracy:", accuracy_score(y_test, y_pred))
-
-# Save model
-joblib.dump(model, "medicine_model.pkl")
-print("✅ Medicine model trained and saved successfully!")
+print("✅ Medicine lookup table saved as medicine_lookup.pkl")

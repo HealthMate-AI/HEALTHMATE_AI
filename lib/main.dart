@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:healthmate/homepage.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:healthmate/loginpage.dart'; // your login page
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // Initialize Firebase
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Homepage(),
+      home: const LoginPage(),
     );
   }
 }
