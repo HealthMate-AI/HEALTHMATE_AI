@@ -39,8 +39,7 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
               onPrimary: Colors.white,
               surface: Colors.black,
               onSurface: Colors.white,
-            ),
-            dialogBackgroundColor: const Color(0xFF101010),
+            ), dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF101010)),
           ),
           child: child!,
         );

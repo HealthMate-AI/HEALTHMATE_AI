@@ -30,10 +30,10 @@ class _DiseaseResultPageState extends State<DiseaseResultPage> {
       "precautions": ["No precautions available."]
     };
 
-    final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
-    await _firestore.collection("past_disease_predictions").add({
+    await firestore.collection("past_disease_predictions").add({
       "userId": currentUserId,
       "diseaseName": widget.diseaseName,
       "details": diseaseInfo["details"],

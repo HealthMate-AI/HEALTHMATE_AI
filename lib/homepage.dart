@@ -132,7 +132,7 @@ class Homepage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const Firstaidguide(),
+                          builder: (_) => const FirstAidGuide(),
                         ),
                       );
                     },
@@ -289,7 +289,7 @@ class _HomepageDrawerState extends State<HomepageDrawer> {
 }),
 
             _drawerItem(context, "First Aid Guide", Icons.health_and_safety, () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const Firstaidguide()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const FirstAidGuide()));
             }),
             _drawerItem(context, "Past Predictions", Icons.history, () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const PastPredictionsPage()));
