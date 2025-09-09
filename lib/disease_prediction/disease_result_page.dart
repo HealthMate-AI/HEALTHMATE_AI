@@ -18,30 +18,49 @@ class DiseaseResultPage extends StatefulWidget {
 }
 
 class _DiseaseResultPageState extends State<DiseaseResultPage> {
-  @override
   void initState() {
-    super.initState();
+  super.initState();
+  if (widget.diseaseName.isNotEmpty &&
+      widget.diseaseName != "Could not connect to server" &&
+      widget.diseaseName != "No disease found") {
     savePastPrediction();
   }
+}
 
   Future<void> savePastPrediction() async {
-    final diseaseInfo = diseaseData[widget.diseaseName.toLowerCase()] ?? {
-      "details": "No details available for this disease.",
-      "precautions": ["No precautions available."]
-    };
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
 
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
-    final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+  // ❌ Do NOT save if prediction is an error
+  final String disease = widget.diseaseName.trim();
+  if (disease.isEmpty ||
+      disease.toLowerCase().contains("error") ||
+      disease.toLowerCase().contains("not found")) {
+    return;
+  }
 
-    await firestore.collection("past_disease_predictions").add({
-      "userId": currentUserId,
-      "diseaseName": widget.diseaseName,
+  final diseaseInfo = diseaseData[disease.toLowerCase()] ?? {
+    "details": "No details available for this disease.",
+    "precautions": ["No precautions available."]
+  };
+
+  try {
+    await FirebaseFirestore.instance
+        .collection("past_disease_predictions")
+        .add({
+      "userId": user.uid,
+      "diseaseName": disease,
       "details": diseaseInfo["details"],
       "precautions": diseaseInfo["precautions"],
       "symptoms": widget.selectedSymptoms,
       "timestamp": FieldValue.serverTimestamp(),
+      "source": "app", // ✅ Firestore rule compatibility
     });
+  } catch (e) {
+    print("Failed to save prediction: $e");
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

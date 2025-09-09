@@ -66,6 +66,7 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
         // Write dates as concrete DateTime so they are non-null immediately (avoids flicker)
         'addedAt': DateTime.now(),
         'expiryDate': _selectedDate,
+"source": "app",
       });
 
       _nameController.clear();

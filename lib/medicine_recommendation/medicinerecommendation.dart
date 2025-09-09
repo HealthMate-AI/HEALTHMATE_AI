@@ -25,6 +25,8 @@ class _MedicineRecommendationPageState
 
   List<String> recommendedMedicines = [];
   String errorMessage = "";
+  String? correctedDisease;
+  String? noteMessage; // ✅ new field
   bool isLoading = false;
 
   bool get isInputValid {
@@ -33,7 +35,7 @@ class _MedicineRecommendationPageState
     return disease.isNotEmpty && age > 0;
   }
 
-  // Function to save recommendation to Firestore
+  // Save recommendation to Firestore
   Future<void> saveRecommendation(String disease, String medicine) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -42,10 +44,12 @@ class _MedicineRecommendationPageState
       await FirebaseFirestore.instance
           .collection("past_medicine_recommendations")
           .add({
-        "userId": user.uid,
-        "diseaseName": disease,
+        "userId": FirebaseAuth.instance.currentUser!.uid,
+        "diseaseName": disease, // ✅ corrected disease
         "medicineName": medicine,
         "timestamp": FieldValue.serverTimestamp(),
+            "source": "app"
+
       });
     } catch (e) {
       print("Failed to save recommendation: $e");
@@ -59,30 +63,36 @@ class _MedicineRecommendationPageState
       isLoading = true;
       recommendedMedicines = [];
       errorMessage = "";
+      correctedDisease = null;
+      noteMessage = null;
     });
 
-    List<String> response = await MedicineService.getRecommendedMedicine(
-      diseaseController.text.trim(),
-      int.parse(ageController.text.trim()),
-    );
+    String disease = diseaseController.text.trim();
+    int age = int.tryParse(ageController.text.trim()) ?? 0;
+
+    final result = await MedicineService.getRecommendedMedicine(disease, age);
 
     setState(() {
       isLoading = false;
 
-      if (response.isEmpty) {
-        errorMessage = "No medicine found for this input";
-      } else if (response.length == 1 &&
-          (response[0].startsWith("Error") ||
-              response[0].startsWith("❌") ||
-              response[0].startsWith("⚠️") ||
-              response[0].startsWith("🚨"))) {
-        errorMessage = response[0]; // API or connection error
-      } else {
-        recommendedMedicines = response;
+      if (result.error != null) {
+        errorMessage = result.error!;
+      } else if (result.note != null) {
+        // ✅ show backend note if disease not found
+        noteMessage = result.note;
+      } else if (result.medicine != null) {
+        recommendedMedicines = [result.medicine!];
 
-        // Save each recommended medicine to Firestore
-        for (var med in recommendedMedicines) {
-          saveRecommendation(diseaseController.text.trim(), med);
+        correctedDisease = result.correctedDisease;
+
+        // ✅ Save only if a valid medicine exists
+        String finalDisease = result.correctedDisease ?? disease;
+        saveRecommendation(finalDisease, result.medicine!);
+        if (!result.medicine!.toLowerCase().contains("error")) {
+          String finalDisease = result.correctedDisease ?? disease;
+          saveRecommendation(finalDisease, result.medicine!);
+        } else {
+          errorMessage = "No medicine found for this input";
         }
       }
     });
@@ -195,11 +205,37 @@ class _MedicineRecommendationPageState
               Text(
                 errorMessage,
                 style: const TextStyle(
-                    color: Colors.redAccent,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold),
+                  color: Colors.redAccent,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ] else if (noteMessage != null) ...[
+              Text(
+                noteMessage!,
+                style: const TextStyle(
+                  color: Colors.yellowAccent,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
             ] else if (recommendedMedicines.isNotEmpty) ...[
+              if (correctedDisease != null &&
+                  correctedDisease!.toLowerCase() !=
+                      diseaseController.text.trim().toLowerCase())
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    "Did you mean: $correctedDisease?",
+                    style: const TextStyle(
+                      color: Colors.yellowAccent,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               const Text(
                 "Recommended Medicine:",
                 style: TextStyle(
