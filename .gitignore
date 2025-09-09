@@ -50,3 +50,5 @@ app.*.map.json
 dataset/
 data/
 input.json
+*.joblib
+/medicinerecommendation_backend/medicine_model.joblib
