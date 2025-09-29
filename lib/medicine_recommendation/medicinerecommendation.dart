@@ -26,7 +26,7 @@ class _MedicineRecommendationPageState
   List<String> recommendedMedicines = [];
   String errorMessage = "";
   String? correctedDisease;
-  String? noteMessage; // ✅ new field
+  String? noteMessage; // ✅ backend note
   bool isLoading = false;
 
   bool get isInputValid {
@@ -44,12 +44,11 @@ class _MedicineRecommendationPageState
       await FirebaseFirestore.instance
           .collection("past_medicine_recommendations")
           .add({
-        "userId": FirebaseAuth.instance.currentUser!.uid,
-        "diseaseName": disease, // ✅ corrected disease
+        "userId": user.uid,
+        "diseaseName": disease,
         "medicineName": medicine,
         "timestamp": FieldValue.serverTimestamp(),
-            "source": "app"
-
+        "source": "app"
       });
     } catch (e) {
       print("Failed to save recommendation: $e");
@@ -78,22 +77,17 @@ class _MedicineRecommendationPageState
       if (result.error != null) {
         errorMessage = result.error!;
       } else if (result.note != null) {
-        // ✅ show backend note if disease not found
         noteMessage = result.note;
-      } else if (result.medicine != null) {
+      } else if (result.medicine != null &&
+          !result.medicine!.toLowerCase().contains("error")) {
+        // ✅ Valid medicine
         recommendedMedicines = [result.medicine!];
-
         correctedDisease = result.correctedDisease;
 
-        // ✅ Save only if a valid medicine exists
         String finalDisease = result.correctedDisease ?? disease;
-        saveRecommendation(finalDisease, result.medicine!);
-        if (!result.medicine!.toLowerCase().contains("error")) {
-          String finalDisease = result.correctedDisease ?? disease;
-          saveRecommendation(finalDisease, result.medicine!);
-        } else {
-          errorMessage = "No medicine found for this input";
-        }
+        saveRecommendation(finalDisease, result.medicine!); // Save only once
+      } else {
+        errorMessage = "No medicine found for this input";
       }
     });
   }
