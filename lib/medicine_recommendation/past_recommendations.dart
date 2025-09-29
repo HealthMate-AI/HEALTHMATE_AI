@@ -52,6 +52,7 @@ class PastRecommendationsPage extends StatelessWidget {
             );
           }
 
+          // ✅ Show all recommendations sorted by timestamp
           final recommendations = docs
               .map((doc) => doc.data() as Map<String, dynamic>)
               .where((data) => data["timestamp"] != null)
@@ -60,7 +61,7 @@ class PastRecommendationsPage extends StatelessWidget {
           recommendations.sort((a, b) {
             final t1 = (a["timestamp"] as Timestamp).toDate();
             final t2 = (b["timestamp"] as Timestamp).toDate();
-            return t2.compareTo(t1);
+            return t2.compareTo(t1); // newest first
           });
 
           return ListView.builder(

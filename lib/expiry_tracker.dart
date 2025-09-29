@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class ExpiryTrackerPage extends StatefulWidget {
   final String username;
@@ -20,6 +21,13 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
   final TextEditingController _nameController = TextEditingController();
   DateTime? _selectedDate;
   bool _isSaving = false;
+
+  // Track notified medicine IDs to avoid duplicate notifications per session
+  final Set<String> _notifiedMedicineIds = {};
+
+  // Add notification plugin instance
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   bool get _isFormValid =>
       _nameController.text.trim().isNotEmpty && _selectedDate != null && !_isSaving;
@@ -57,24 +65,32 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
 
     setState(() => _isSaving = true);
     try {
-      // Write using REQUIRED collection & fields:
-      // collection: medicine_expiry_tracker
-      // fields: addedAt, expiryDate, medicineName, userId
+      final medicineName = _nameController.text.trim(); // <-- store before clearing
+
       await FirebaseFirestore.instance.collection('medicine_expiry_tracker').add({
         'userId': user.uid,
-        'medicineName': _nameController.text.trim(),
-        // Write dates as concrete DateTime so they are non-null immediately (avoids flicker)
+        'medicineName': medicineName,
         'addedAt': DateTime.now(),
         'expiryDate': _selectedDate,
-"source": "app",
+        "source": "app",
       });
 
       _nameController.clear();
       setState(() => _selectedDate = null);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Medicine added')),
+        SnackBar(content: Text('✅ $medicineName added')), // <-- use variable
       );
+
+      // Show notification in notification bar
+      await _showExpiryNotification(
+        'Medicine Added',
+        '✅ $medicineName has been added.' // <-- use variable
+      );
+
+      // Check for expiring medicines after adding
+      await _checkExpiringMedicines();
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('❌ Failed to add: $e')),
@@ -131,11 +147,125 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
     return '$y-$m-$day';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initNotifications();
+    _checkExpiringMedicines();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkExpiringMedicines();
+  }
+
+  Future<void> _initNotifications() async {
+    // Android initialization
+    const AndroidInitializationSettings androidInit =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    // iOS initialization
+    const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
+
+    final InitializationSettings initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await _flutterLocalNotificationsPlugin.initialize(initSettings);
+
+    // No permission request needed for Android
+  }
+
+  Future<void> _showExpiryNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'expiry_channel', // channel id
+      'Medicine Expiry', // channel name
+      channelDescription: 'Notifications for medicine expiry',
+      importance: Importance.max,
+      priority: Priority.high,
+      color: Color(0xFF01D6A4),
+      playSound: true, // <-- ensure sound is played
+      enableVibration: true, // <-- ensure vibration
+    );
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+    await _flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000, // unique id
+      title,
+      body,
+      details,
+    );
+  }
+
+  Future<void> _checkExpiringMedicines() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('medicine_expiry_tracker')
+        .where('userId', isEqualTo: user.uid)
+        .get();
+
+    final now = DateTime.now();
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final expiryTs = data['expiryDate'];
+      DateTime? expiryDate;
+      if (expiryTs is Timestamp) {
+        expiryDate = expiryTs.toDate();
+      } else if (expiryTs is DateTime) {
+        expiryDate = expiryTs;
+      }
+      if (expiryDate == null) continue;
+
+      final medicineName = data['medicineName'] ?? 'Unknown';
+      final id = doc.id;
+
+      // Only notify once per session
+      if (_notifiedMedicineIds.contains(id)) continue;
+
+DateTime today = DateTime(now.year, now.month, now.day);
+DateTime expiryOnlyDate = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
+      if (daysDiff < 0) {
+        message = '⚠️ $medicineName has already expired!';
+      } else if (daysDiff == 0) {
+        message = '⚠️ $medicineName expires today!';
+      } else if (daysDiff == 1) {
+        message = '⏰ $medicineName expires in 1 day!';
+      } else if (daysDiff <= 7) {
+        message = '⏰ $medicineName expires in $daysDiff days!';
+      } else if (daysDiff <= 30) {
+        message = '⏰ $medicineName expires in $daysDiff days (within 1 month)!';
+      }
+
+      if (message != null) {
+        _notifiedMedicineIds.add(id);
+        // Show notification in notification bar
+        await _showExpiryNotification('Medicine Expiry Alert', message);
+      }
     }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final String uid = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'User not signed in.',
+            style: TextStyle(color: Colors.redAccent, fontSize: 18),
+          ),
+        ),
+      );
+    }
+    final String uid = user.uid;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -354,3 +484,4 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
     );
   }
 }
+
