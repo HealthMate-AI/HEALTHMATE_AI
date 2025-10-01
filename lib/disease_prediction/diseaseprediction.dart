@@ -7,8 +7,12 @@ import 'disease_result_page.dart';
 class DiseasePredictionPage extends StatefulWidget {
   final String username;
   final String email;
-  const DiseasePredictionPage({super.key,required this.username,
-    required this.email,});
+
+  const DiseasePredictionPage({
+    super.key,
+    required this.username,
+    required this.email,
+  });
 
   @override
   _DiseasePredictionPageState createState() => _DiseasePredictionPageState();
@@ -17,8 +21,8 @@ class DiseasePredictionPage extends StatefulWidget {
 class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
   Map<String, int> selectedSymptoms = {};
   List<String> displayedSymptoms = [];
-  String predictedDisease = '';
   TextEditingController searchController = TextEditingController();
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -37,7 +41,40 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
     });
   }
 
-  bool get hasSelectedSymptoms => selectedSymptoms.containsValue(1);
+  bool get hasSelectedSymptoms =>
+      selectedSymptoms.values.where((v) => v == 1).length >= 3;
+
+  Future<void> handlePredict() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String diseaseName =
+          await DiseaseService.predictDisease(selectedSymptoms);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DiseaseResultPage(
+            diseaseName: diseaseName,
+            selectedSymptoms: selectedSymptoms.entries
+                .where((entry) => entry.value == 1)
+                .map((entry) => entry.key)
+                .toList(),
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +86,10 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
           onPressed: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => Homepage(username: widget.username,
-      email: widget.email,)),
+              MaterialPageRoute(
+                builder: (_) =>
+                    Homepage(username: widget.username, email: widget.email),
+              ),
             );
           },
         ),
@@ -86,11 +125,22 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
                 decoration: InputDecoration(
                   hintText: "Search symptoms...",
                   hintStyle: const TextStyle(color: Colors.greenAccent),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF01D6A4)),
+                  prefixIcon:
+                      const Icon(Icons.search, color: Color(0xFF01D6A4)),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onChanged: filterSymptoms,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Selected count indicator
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Selected symptoms: ${selectedSymptoms.values.where((v) => v == 1).length} (min 3)",
+                style: const TextStyle(color: Colors.greenAccent),
               ),
             ),
             const SizedBox(height: 10),
@@ -118,29 +168,7 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
 
             // Predict Button
             GestureDetector(
-              onTap: hasSelectedSymptoms
-                  ? () async {
-                      String result = await DiseaseService.predictDisease(
-                          selectedSymptoms);
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DiseaseResultPage(
-                            diseaseName: result,
-                            selectedSymptoms: selectedSymptoms.entries
-                                .where((entry) => entry.value == 1)
-                                .map((entry) => entry.key)
-                                .toList(),
-                          ),
-                        ),
-                      );
-
-                      setState(() {
-                        predictedDisease = result;
-                      });
-                    }
-                  : null,
+              onTap: hasSelectedSymptoms && !isLoading ? handlePredict : null,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -149,9 +177,7 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
                       ? const LinearGradient(
                           colors: [Color(0xFF056443), Color(0xFF013924)],
                         )
-                      : const LinearGradient(
-                          colors: [Colors.grey, Colors.grey],
-                        ),
+                      : const LinearGradient(colors: [Colors.grey, Colors.grey]),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(color: const Color(0xFF00A57E), width: 1),
                   boxShadow: const [
@@ -163,13 +189,16 @@ class _DiseasePredictionPageState extends State<DiseasePredictionPage> {
                   ],
                 ),
                 child: Center(
-                  child: Text(
-                    "Predict Disease",
-                    style: TextStyle(
-                        color:
-                            hasSelectedSymptoms ? Colors.white : Colors.black38,
-                        fontWeight: FontWeight.bold),
-                  ),
+                  child: isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : Text(
+                          "Predict Disease",
+                          style: TextStyle(
+                              color: hasSelectedSymptoms
+                                  ? Colors.white
+                                  : Colors.black38,
+                              fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ),

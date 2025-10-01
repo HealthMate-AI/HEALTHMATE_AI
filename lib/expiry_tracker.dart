@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'expiry_checker.dart';
 
 class ExpiryTrackerPage extends StatefulWidget {
   final String username;
@@ -22,13 +22,6 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
   DateTime? _selectedDate;
   bool _isSaving = false;
 
-  // Track notified medicine IDs to avoid duplicate notifications per session
-  final Set<String> _notifiedMedicineIds = {};
-
-  // Add notification plugin instance
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
   bool get _isFormValid =>
       _nameController.text.trim().isNotEmpty && _selectedDate != null && !_isSaving;
 
@@ -47,7 +40,9 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
               onPrimary: Colors.white,
               surface: Colors.black,
               onSurface: Colors.white,
-            ), dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF101010)),
+            ),
+            dialogTheme:
+                const DialogThemeData(backgroundColor: Color(0xFF101010)),
           ),
           child: child!,
         );
@@ -65,7 +60,7 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
 
     setState(() => _isSaving = true);
     try {
-      final medicineName = _nameController.text.trim(); // <-- store before clearing
+      final medicineName = _nameController.text.trim();
 
       await FirebaseFirestore.instance.collection('medicine_expiry_tracker').add({
         'userId': user.uid,
@@ -79,17 +74,11 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
       setState(() => _selectedDate = null);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ $medicineName added')), // <-- use variable
+        SnackBar(content: Text('✅ $medicineName added')),
       );
 
-      // Show notification in notification bar
-      await _showExpiryNotification(
-        'Medicine Added',
-        '✅ $medicineName has been added.' // <-- use variable
-      );
-
-      // Check for expiring medicines after adding
-      await _checkExpiringMedicines();
+      // Notify about newly added medicine
+      await checkExpiringMedicinesOnStart(user: FirebaseAuth.instance.currentUser!);
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,114 +131,10 @@ class _ExpiryTrackerPageState extends State<ExpiryTrackerPage> {
   }
 
   String _formatYmd(DateTime d) {
-    // Simple YYYY-MM-DD without intl
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
     return '$y-$m-$day';
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _initNotifications();
-    _checkExpiringMedicines();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkExpiringMedicines();
-  }
-
-  Future<void> _initNotifications() async {
-    // Android initialization
-    const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    // iOS initialization
-    const DarwinInitializationSettings iosInit = DarwinInitializationSettings();
-
-    final InitializationSettings initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
-
-    await _flutterLocalNotificationsPlugin.initialize(initSettings);
-
-    // No permission request needed for Android
-  }
-
-  Future<void> _showExpiryNotification(String title, String body) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'expiry_channel', // channel id
-      'Medicine Expiry', // channel name
-      channelDescription: 'Notifications for medicine expiry',
-      importance: Importance.max,
-      priority: Priority.high,
-      color: Color(0xFF01D6A4),
-      playSound: true, // <-- ensure sound is played
-      enableVibration: true, // <-- ensure vibration
-    );
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: DarwinNotificationDetails(),
-    );
-    await _flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000, // unique id
-      title,
-      body,
-      details,
-    );
-  }
-
-  Future<void> _checkExpiringMedicines() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final snapshot = await FirebaseFirestore.instance
-        .collection('medicine_expiry_tracker')
-        .where('userId', isEqualTo: user.uid)
-        .get();
-
-    final now = DateTime.now();
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final expiryTs = data['expiryDate'];
-      DateTime? expiryDate;
-      if (expiryTs is Timestamp) {
-        expiryDate = expiryTs.toDate();
-      } else if (expiryTs is DateTime) {
-        expiryDate = expiryTs;
-      }
-      if (expiryDate == null) continue;
-
-      final medicineName = data['medicineName'] ?? 'Unknown';
-      final id = doc.id;
-
-      // Only notify once per session
-      if (_notifiedMedicineIds.contains(id)) continue;
-
-DateTime today = DateTime(now.year, now.month, now.day);
-DateTime expiryOnlyDate = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
-final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
-      if (daysDiff < 0) {
-        message = '⚠️ $medicineName has already expired!';
-      } else if (daysDiff == 0) {
-        message = '⚠️ $medicineName expires today!';
-      } else if (daysDiff == 1) {
-        message = '⏰ $medicineName expires in 1 day!';
-      } else if (daysDiff <= 7) {
-        message = '⏰ $medicineName expires in $daysDiff days!';
-      } else if (daysDiff <= 30) {
-        message = '⏰ $medicineName expires in $daysDiff days (within 1 month)!';
-      }
-
-      if (message != null) {
-        _notifiedMedicineIds.add(id);
-        // Show notification in notification bar
-        await _showExpiryNotification('Medicine Expiry Alert', message);
-      }
-    }
   }
 
   @override
@@ -323,8 +208,6 @@ final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
               ],
             ),
             const SizedBox(height: 18),
-
-            // Add Medicine button (same style as your "Get Recommendation" button)
             GestureDetector(
               onTap: _isFormValid ? _addMedicine : null,
               child: Container(
@@ -359,7 +242,6 @@ final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
                 ),
               ),
             ),
-
             const SizedBox(height: 24),
             const Align(
               alignment: Alignment.centerLeft,
@@ -373,9 +255,6 @@ final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
               ),
             ),
             const SizedBox(height: 8),
-
-            // Stream WITHOUT orderBy => no composite index required.
-            // We sort client-side by addedAt desc to keep a stable order.
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -408,7 +287,6 @@ final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
                     );
                   }
 
-                  // Map + client-side sort by addedAt desc (avoids index requirement & flicker)
                   final items = docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     final addedTs = data['addedAt'];
@@ -484,4 +362,3 @@ final daysDiff = expiryOnlyDate.difference(today).inDays;      String? message;
     );
   }
 }
-

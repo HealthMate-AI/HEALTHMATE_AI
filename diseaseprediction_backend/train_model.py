@@ -1,35 +1,47 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 import joblib
+import matplotlib.pyplot as plt
 
-# 1. Load dataset
+# --------------------------
+# 1️⃣ Load dataset
+# --------------------------
 data = pd.read_csv("dataset.csv")
 
-print("Before cleaning:", data.shape)
+# Keep only diseases with ≥2 occurrences
+counts = data["diseases"].value_counts()
+data = data[data["diseases"].isin(counts[counts >= 2].index)]
 
-# 2. Clean dataset
-data = data.dropna().drop_duplicates()
-print("After cleaning:", data.shape)
+print(f"Filtered dataset: {data.shape[0]} rows, {len(data.columns)-1} symptoms")
+print(f"Unique diseases after filtering: {data['diseases'].nunique()}")
 
-# 3. Features = all symptom columns, Target = 'diseases'
-X = data.drop("diseases", axis=1)
+# Separate features and labels
+X = data.drop(columns=["diseases"])
 y = data["diseases"]
 
-# 4. Train/test split
+# --------------------------
+# 2️⃣ Train-test split
+# --------------------------
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# 5. Train Naive Bayes model
-model = MultinomialNB()
+# --------------------------
+# 3️⃣ Train GaussianNB model
+# --------------------------
+model = GaussianNB()
 model.fit(X_train, y_train)
 
-# 6. Evaluate accuracy
+# Evaluate on test set
 y_pred = model.predict(X_test)
-print("Accuracy:", accuracy_score(y_test, y_pred))
+print("✅ Full model accuracy:", accuracy_score(y_test, y_pred))
 
-# 7. Save model
-joblib.dump(model, "disease_model.pkl")
-print("✅ Model trained and saved!")
+# --------------------------
+# 4️⃣ Save model, columns, classes
+# --------------------------
+joblib.dump(model, "disease_prediction_model.pkl")
+joblib.dump(X.columns.tolist(), "symptom_columns.pkl")
+joblib.dump(model.classes_, "disease_classes.pkl")
+print("✅ Model, symptom columns, and disease classes saved")

@@ -2,38 +2,52 @@ from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
 
-# 1. Initialize Flask app
+# --------------------------
+# 1️⃣ Initialize Flask app
+# --------------------------
 app = Flask(__name__)
 
-# 2. Load trained model
-model = joblib.load("disease_model.pkl")
+# --------------------------
+# 2️⃣ Load trained model + columns + classes
+# --------------------------
+model = joblib.load("disease_prediction_model.pkl")
+symptom_columns = joblib.load("symptom_columns.pkl")
+disease_classes = joblib.load("disease_classes.pkl")
 
-# 3. Load dataset columns (symptom columns)
-data = pd.read_csv("dataset.csv")
-symptom_columns = list(data.columns)
-symptom_columns.remove("diseases")  # all other columns are symptoms
-
+# --------------------------
+# 3️⃣ Home endpoint
+# --------------------------
 @app.route('/')
 def home():
     return "✅ Disease Prediction API is running!"
 
+# --------------------------
+# 4️⃣ Prediction endpoint (Top-1 disease only)
+# --------------------------
 @app.route('/predict', methods=['POST'])
 def predict():
     input_json = request.get_json()
+    if not input_json:
+        return jsonify({"error": "No input provided"}), 400
 
-    # 1. Convert input JSON to DataFrame with proper columns
-    input_df = pd.DataFrame.from_records([input_json], columns=symptom_columns)
-    
-    # 2. Fill missing symptom columns with 0
-    input_df = input_df.fillna(0)
+    # Convert input JSON to DataFrame
+    input_df = pd.DataFrame([input_json])
 
-    # 3. Ensure correct column order
-    input_df = input_df[symptom_columns]
+    # Keep only known symptoms & add missing ones as 0
+    input_df = input_df[[col for col in input_df.columns if col in symptom_columns]]
+    input_df = input_df.reindex(columns=symptom_columns, fill_value=0)
 
-    # 4. Predict disease
-    prediction = model.predict(input_df)[0]
+    # Ensure numeric type
+    input_df = input_df.astype(int)
 
-    return jsonify({"predicted_disease": prediction})
+    # Predict
+    predicted_index = model.predict(input_df)[0]  # Only the predicted class
+    predicted_disease = str(predicted_index)
 
+    return jsonify({"disease": predicted_disease})
+
+# --------------------------
+# 5️⃣ Run the app
+# --------------------------
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
